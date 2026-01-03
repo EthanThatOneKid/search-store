@@ -5,8 +5,7 @@ import type * as rdfjs from "@rdfjs/types";
  */
 export interface SearchStore<TQuad extends rdfjs.BaseQuad = rdfjs.Quad> {
   /**
-   * getStringLiterals returns an async iterator that yields all string
-   * literals in the store.
+   * snapshot snapshots every quad with a string literal in the quad object.
    */
-  getStringLiterals(): AsyncIterable<TQuad>;
+  snapshot(): AsyncIterable<TQuad>;
 }
