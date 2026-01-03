@@ -1,6 +1,12 @@
 {
   "tasks": {
-    "test": "deno test -A"
+    "test": "deno test -A",
+    "fmt": "deno fmt",
+    "lint": "deno lint",
+    "precommit": {
+      "description": "Run precommit tasks",
+      "dependencies": ["test", "lint", "fmt"]
+    }
   },
   "imports": {
     "@rdfjs/types": "npm:@rdfjs/types@^2.0.1",
