@@ -1,28 +1,26 @@
 import type * as rdfjs from "@rdfjs/types";
 
 /**
- * SearchStore is a search store that enables efficient searching of RDF data.
- *
- * This interface adapts RDF quads to search store documents.
+ * SearchStore is a store that can be searched.
  */
 export interface SearchStore {
   /**
-   * addQuad adds a quad to the RDF store.
+   * search searches the store for quads matching the query.
    */
-  addQuad(quad: rdfjs.Quad): Promise<void>;
+  search(query: string): Promise<RankedResult<rdfjs.Quad>[]>;
+}
+
+/**
+ * RankedResult is a result with a score.
+ */
+export interface RankedResult<T> {
+  /**
+   * score is the score of the result.
+   */
+  score: number;
 
   /**
-   * addQuads adds multiple quads to the RDF store.
+   * value is the result value.
    */
-  addQuads(quads: rdfjs.Quad[]): Promise<void>;
-
-  /**
-   * removeQuad removes a quad from the RDF store.
-   */
-  removeQuad(quad: rdfjs.Quad): Promise<void>;
-
-  /**
-   * removeQuads removes multiple quads from the RDF store.
-   */
-  removeQuads(quads: rdfjs.Quad[]): Promise<void>;
+  value: T;
 }
