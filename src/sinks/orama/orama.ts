@@ -1,10 +1,10 @@
 import type * as rdfjs from "@rdfjs/types";
 import { create, insertMultiple, removeMultiple, search } from "@orama/orama";
 import { DataFactory } from "n3";
-import type { RankedResult, SearchStore } from "../../search-store.ts";
-import type { Patch, PatchSink } from "../../patch.ts";
-import { skolemizeQuad } from "../../skolem.ts";
-import type { Embedder } from "../../embeddings/embedder.ts";
+import type { RankedResult, SearchStore } from "../../types/store.ts";
+import type { Patch, PatchSink } from "../../types/patch.ts";
+import { skolemizeQuad } from "../../utils/skolem.ts";
+import type { Embedder } from "../../types/embedder.ts";
 
 /**
  * Orama is the type of our Orama instance.

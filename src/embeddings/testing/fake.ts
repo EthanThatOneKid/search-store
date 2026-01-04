@@ -1,4 +1,4 @@
-import type { Embedder } from "./embedder.ts";
+import type { Embedder } from "../../types/embedder.ts";
 
 /**
  * FakeEmbedder for testing that returns a fixed-size vector.

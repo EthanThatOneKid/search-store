@@ -1,6 +1,11 @@
 import { Store } from "n3";
 import type * as rdfjs from "@rdfjs/types";
-import type { Patch, PatchSink, PatchSource, QuadSource } from "../../patch.ts";
+import type {
+  Patch,
+  PatchSink,
+  PatchSource,
+  QuadSource,
+} from "../../types/patch.ts";
 import { createN3Proxy } from "./proxy.ts";
 
 /**
