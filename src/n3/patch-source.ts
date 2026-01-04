@@ -1,6 +1,6 @@
 import { Store } from "n3";
 import type { Patch, PatchSource } from "../patch.ts";
-import { n3Proxy } from "./proxy.ts";
+import { createN3Proxy } from "./proxy.ts";
 
 /**
  * N3PatchSource is a source that produces patches from an N3 store.
@@ -10,7 +10,7 @@ export class N3PatchSource implements PatchSource {
   private readonly subscribers = new Set<(patch: Patch) => void>();
 
   public constructor(store: Store) {
-    this.store = n3Proxy(store, this.subscribers);
+    this.store = createN3Proxy(store, this.subscribers);
   }
 
   public subscribe(fn: (patch: Patch) => void): () => void {
