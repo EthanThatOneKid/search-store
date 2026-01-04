@@ -1,5 +1,6 @@
 import type * as rdfjs from "@rdfjs/types";
-import { create, insertMultiple, removeMultiple } from "@orama/orama";
+import { create, insertMultiple, removeMultiple, search } from "@orama/orama";
+import { DataFactory } from "n3";
 import type { RankedResult, SearchStore } from "../../search-store.ts";
 import type { Patch, PatchSink } from "../../patch.ts";
 import { skolemizeQuad } from "../../skolem.ts";
@@ -38,6 +39,8 @@ export interface OramaEmbedder {
 export class OramaSearchStore implements SearchStore, PatchSink {
   public constructor(
     private readonly orama: Orama,
+    //
+    // TODO: Disable vector search by leaving the embedder undefined.
     private readonly embedder: OramaEmbedder,
   ) {}
 
@@ -48,7 +51,41 @@ export class OramaSearchStore implements SearchStore, PatchSink {
     query: string,
     limit?: number,
   ): Promise<RankedResult<rdfjs.NamedNode>[]> {
-    throw new Error("Method not implemented.");
+    // Handle empty query - return empty array
+    if (!query || query.trim().length === 0) {
+      return [];
+    }
+
+    // Generate embedding for the query
+    const embedding = await this.embedder.embed(query);
+
+    // Perform hybrid search using Orama's built-in hybrid mode
+    const results = await search(this.orama, {
+      mode: "hybrid",
+      term: query,
+      vector: {
+        value: embedding,
+        property: "embedding",
+      },
+      limit: limit ?? 10,
+      includeVectors: false,
+    });
+
+    // Convert Orama hits to RankedResult<rdfjs.NamedNode>[]
+    return results.hits.map((hit, index) => {
+      const document = hit.document as {
+        subject: string;
+        predicate: string;
+        object: string;
+        graph: string;
+      };
+
+      return {
+        rank: index + 1,
+        score: hit.score,
+        value: DataFactory.namedNode(document.subject),
+      };
+    });
   }
 
   public async patch(patch: Patch): Promise<void> {

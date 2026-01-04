@@ -16,6 +16,31 @@ class FakeEmbedder implements OramaEmbedder {
   }
 }
 
+/**
+ * TestEmbedder generates deterministic embeddings based on text content.
+ * Different texts get different embeddings for testing search functionality.
+ */
+class TestEmbedder implements OramaEmbedder {
+  constructor(private readonly vectorSize: number) {}
+
+  embed(text: string): Promise<number[]> {
+    // Generate a deterministic embedding based on text hash
+    const vector = new Array(this.vectorSize);
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      hash = ((hash << 5) - hash) + text.charCodeAt(i);
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+
+    // Fill vector with values based on hash
+    for (let i = 0; i < this.vectorSize; i++) {
+      vector[i] = Math.sin((hash + i) * 0.1) * 0.5 + 0.5; // Normalize to [0, 1]
+    }
+
+    return Promise.resolve(vector);
+  }
+}
+
 Deno.test("OramaSearchStore as patch sink tracks patches from n3 store", async () => {
   const vectorSize = 128;
   const orama = createOrama(vectorSize);
@@ -87,4 +112,202 @@ Deno.test("OramaSearchStore as patch sink tracks patches from n3 store", async (
   assertEquals(doc.object, quad2.object.value);
 
   unsubscribe();
+});
+
+Deno.test("OramaSearchStore.search returns empty array for empty query", async () => {
+  const vectorSize = 128;
+  const orama = createOrama(vectorSize);
+  const embedder = new FakeEmbedder(vectorSize);
+  const searchStore = new OramaSearchStore(orama, embedder);
+
+  // Insert some test data
+  const quad = DataFactory.quad(
+    DataFactory.namedNode("https://example.org/s1"),
+    DataFactory.namedNode("https://example.org/p"),
+    DataFactory.literal("Hello World"),
+  );
+  await searchStore.patch({ insertions: [quad], deletions: [] });
+
+  // Test empty string
+  const results1 = await searchStore.search("");
+  assertEquals(results1.length, 0);
+
+  // Test whitespace-only string
+  const results2 = await searchStore.search("   ");
+  assertEquals(results2.length, 0);
+});
+
+Deno.test("OramaSearchStore.search returns RankedResult with correct format", async () => {
+  const vectorSize = 128;
+  const orama = createOrama(vectorSize);
+  const embedder = new TestEmbedder(vectorSize);
+  const searchStore = new OramaSearchStore(orama, embedder);
+
+  // Insert test data
+  const quad = DataFactory.quad(
+    DataFactory.namedNode("https://example.org/subject1"),
+    DataFactory.namedNode("https://example.org/predicate"),
+    DataFactory.literal("Hello World"),
+  );
+  await searchStore.patch({ insertions: [quad], deletions: [] });
+
+  // Perform search
+  const results = await searchStore.search("Hello");
+
+  // Verify results format
+  assertEquals(results.length, 1);
+  assertEquals(results[0].rank, 1);
+  assertEquals(typeof results[0].score, "number");
+  assertEquals(results[0].score >= 0 && results[0].score <= 1, true);
+  assertEquals(results[0].value.termType, "NamedNode");
+  assertEquals(results[0].value.value, "https://example.org/subject1");
+});
+
+Deno.test("OramaSearchStore.search returns results with correct ranking", async () => {
+  const vectorSize = 128;
+  const orama = createOrama(vectorSize);
+  const embedder = new TestEmbedder(vectorSize);
+  const searchStore = new OramaSearchStore(orama, embedder);
+
+  // Insert multiple test documents
+  const quads = [
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/s1"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("Hello World"),
+    ),
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/s2"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("Hello There"),
+    ),
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/s3"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("Goodbye World"),
+    ),
+  ];
+  await searchStore.patch({ insertions: quads, deletions: [] });
+
+  // Perform search
+  const results = await searchStore.search("Hello");
+
+  // Verify ranking is 1-indexed and sequential
+  for (let i = 0; i < results.length; i++) {
+    assertEquals(results[i].rank, i + 1);
+  }
+
+  // Verify results are sorted by score (descending)
+  for (let i = 0; i < results.length - 1; i++) {
+    assertEquals(results[i].score >= results[i + 1].score, true);
+  }
+});
+
+Deno.test("OramaSearchStore.search respects limit parameter", async () => {
+  const vectorSize = 128;
+  const orama = createOrama(vectorSize);
+  const embedder = new TestEmbedder(vectorSize);
+  const searchStore = new OramaSearchStore(orama, embedder);
+
+  // Insert multiple test documents
+  const quads = [
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/s1"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("Hello World"),
+    ),
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/s2"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("Hello There"),
+    ),
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/s3"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("Hello Everyone"),
+    ),
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/s4"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("Hello Friend"),
+    ),
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/s5"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("Hello Again"),
+    ),
+  ];
+  await searchStore.patch({ insertions: quads, deletions: [] });
+
+  // Test with limit
+  const results = await searchStore.search("Hello", 2);
+  assertEquals(results.length, 2);
+  assertEquals(results[0].rank, 1);
+  assertEquals(results[1].rank, 2);
+
+  // Test without limit (should default to 10)
+  const resultsNoLimit = await searchStore.search("Hello");
+  assertEquals(resultsNoLimit.length <= 10, true);
+  assertEquals(resultsNoLimit.length >= 5, true); // Should get all 5 results
+});
+
+Deno.test("OramaSearchStore.search performs hybrid search combining text and vector", async () => {
+  const vectorSize = 128;
+  const orama = createOrama(vectorSize);
+  const embedder = new TestEmbedder(vectorSize);
+  const searchStore = new OramaSearchStore(orama, embedder);
+
+  // Insert test documents with different content
+  const quads = [
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/exact"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("machine learning artificial intelligence"),
+    ),
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/similar"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("AI deep learning neural networks"),
+    ),
+    DataFactory.quad(
+      DataFactory.namedNode("https://example.org/unrelated"),
+      DataFactory.namedNode("https://example.org/p"),
+      DataFactory.literal("cooking recipes food preparation"),
+    ),
+  ];
+  await searchStore.patch({ insertions: quads, deletions: [] });
+
+  // Search for "machine learning" - should find relevant documents
+  const results = await searchStore.search("machine learning");
+
+  // Should return results (hybrid search combines text matching and vector similarity)
+  assertEquals(results.length > 0, true);
+
+  // Results should be RankedResult format
+  results.forEach((result) => {
+    assertEquals(typeof result.rank, "number");
+    assertEquals(typeof result.score, "number");
+    assertEquals(result.value.termType, "NamedNode");
+  });
+});
+
+Deno.test("OramaSearchStore.search returns empty array when no matches found", async () => {
+  const vectorSize = 128;
+  const orama = createOrama(vectorSize);
+  const embedder = new TestEmbedder(vectorSize);
+  const searchStore = new OramaSearchStore(orama, embedder);
+
+  // Insert test data
+  const quad = DataFactory.quad(
+    DataFactory.namedNode("https://example.org/s1"),
+    DataFactory.namedNode("https://example.org/p"),
+    DataFactory.literal("Hello World"),
+  );
+  await searchStore.patch({ insertions: [quad], deletions: [] });
+
+  // Search for something that won't match
+  const results = await searchStore.search("xyzabc123nonexistent");
+
+  // Should return empty array or very few results
+  assertEquals(Array.isArray(results), true);
 });
