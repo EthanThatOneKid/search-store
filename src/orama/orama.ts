@@ -1,6 +1,5 @@
 import type * as rdfjs from "@rdfjs/types";
 import { create, insertMultiple, removeMultiple, search } from "@orama/orama";
-import { DataFactory } from "n3";
 import type { RankedResult, SearchStore } from "#/search-store.ts";
 import type { Patch, PatchSink } from "#/rdf-patch/rdf-patch.ts";
 import { skolemizeQuad } from "#/rdf-patch/skolem.ts";
@@ -33,8 +32,8 @@ export function createOrama(vectorSize?: number) {
  */
 export class OramaSearchStore implements SearchStore, PatchSink {
   public constructor(
+    private readonly dataFactory: rdfjs.DataFactory,
     private readonly orama: Orama,
-    private readonly vectorSize: number | undefined,
     private readonly embedder: Embedder | undefined,
   ) {}
 
@@ -82,7 +81,7 @@ export class OramaSearchStore implements SearchStore, PatchSink {
       return {
         rank: index + 1,
         score: hit.score,
-        value: DataFactory.namedNode(subject),
+        value: this.dataFactory.namedNode(subject),
       };
     });
   }
@@ -111,12 +110,12 @@ export class OramaSearchStore implements SearchStore, PatchSink {
           object: insertion.object.value,
           graph: insertion.graph?.value ?? "",
         };
-        if (this.vectorSize !== undefined) {
-          const embedding = this.embedder
-            ? await this.embedder.embed(insertion.object.value)
-            : new Array(this.vectorSize).fill(0);
-          document.embedding = embedding;
+
+        if (this.embedder) {
+          document.embedding = await this.embedder
+            .embed(insertion.object.value);
         }
+
         return document;
       }),
     );
