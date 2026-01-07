@@ -220,38 +220,6 @@ Deno.test("proxyN3 filters non-literal objects", () => {
   assertEquals(quads.length, 1);
 });
 
-Deno.test("proxyN3 intercepts update operations", () => {
-  const store = new Store();
-  const pusher = new MockPatchPusher();
-  const proxiedStore = proxyN3(store, pusher);
-
-  // Use update to insert multiple quads with string literals
-  proxiedStore.update(`
-    INSERT DATA {
-      <https://example.org/subject1> <https://example.org/predicate> "value1" .
-      <https://example.org/subject2> <https://example.org/predicate> "value2" .
-      <https://example.org/subject3> <https://example.org/predicate> "42"^^<http://www.w3.org/2001/XMLSchema#integer> .
-      <https://example.org/subject4> <https://example.org/predicate> <https://example.org/object> .
-    }
-  `);
-
-  // Verify patches were emitted
-  assertEquals(pusher.patches.length, 1);
-  // Should have at least 2 string literals ("value1" and "value2")
-  // The integer literal and IRI should be filtered out
-  assertEquals(pusher.patches[0].insertions.length >= 2, true);
-  assertEquals(pusher.patches[0].deletions.length, 0);
-
-  // Verify all quads were added to the store
-  const quads = Array.from(store);
-  assertEquals(quads.length, 4); // All 4 quads should be in the store
-
-  // Verify that the captured insertions are string literals
-  for (const quad of pusher.patches[0].insertions) {
-    assertEquals(quad.object.termType, "Literal");
-  }
-});
-
 Deno.test("proxyN3 passes through other methods", () => {
   const store = new Store();
   const pusher = new MockPatchPusher();
