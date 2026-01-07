@@ -1,14 +1,21 @@
 import { DataFactory, Store } from "n3";
 import { QueryEngine } from "@comunica/query-sparql-rdfjs-lite";
+import { ZeroEmbedder } from "./embedder.ts";
 import { createOrama, OramaSearchStore } from "./orama.ts";
 import { proxyN3 } from "./n3.ts";
 import solarSytemSparql from "./solar-system.sparql" with { type: "text" };
 
+// Create a text embedder.
+const vectorSize = 1;
+const embedder = new ZeroEmbedder(vectorSize);
+
 // Create search store.
-const orama = createOrama();
+const orama = createOrama(vectorSize);
 const searchStore = new OramaSearchStore({
   dataFactory: DataFactory,
   orama,
+  embedder,
+  mode: "fulltext",
 });
 
 // Create an RDF store and connect it to the search store.

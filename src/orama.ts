@@ -1,5 +1,6 @@
 import type * as rdfjs from "@rdfjs/types";
 import { create, insertMultiple, removeMultiple, search } from "@orama/orama";
+import type { Embedder } from "./embedder.ts";
 import type { RankedResult, SearchStore } from "./search-store.ts";
 import type { Patch, PatchPusher } from "./rdf-patch.ts";
 import { skolemizeQuad } from "./skolem.ts";
@@ -12,14 +13,14 @@ export type Orama = ReturnType<typeof createOrama>;
 /**
  * createOrama creates a new Orama instance.
  */
-export function createOrama() {
+export function createOrama(vectorSize: number) {
   return create({
     schema: {
       id: "string",
       subject: "string",
       predicate: "string",
       object: "string",
-      graph: "string",
+      embedding: `vector[${vectorSize}]`,
     },
   });
 }
@@ -32,23 +33,24 @@ export interface OramaDocument {
   subject: string;
   predicate: string;
   object: string;
-  graph: string;
+  embedding: number[];
 }
 
 /**
  * generateOramaDocument generates an Orama document from a quad.
  */
 export async function generateOramaDocument(
-  _options: OramaSearchStoreOptions,
+  embedder: Embedder,
   quad: rdfjs.Quad,
 ): Promise<OramaDocument> {
   const documentId = await skolemizeQuad(quad);
+  const embedding = await embedder.embed(quad.object.value);
   return {
     id: documentId,
     subject: quad.subject.value,
     predicate: quad.predicate.value,
     object: quad.object.value,
-    graph: quad.graph?.value ?? "",
+    embedding,
   };
 }
 
@@ -58,10 +60,14 @@ export async function generateOramaDocument(
 export interface OramaSearchStoreOptions {
   dataFactory: rdfjs.DataFactory;
   orama: Orama;
+  embedder: Embedder;
+  mode: "fulltext" | "hybrid" | "vector";
 }
 
 /**
- * OramaStore is a store that can be searched and patched.
+ * OramaSearchStore is a store that can be searched and patched.
+ *
+ * @see https://docs.orama.com/docs/cloud/performing-search/introduction
  */
 export class OramaSearchStore implements SearchStore, PatchPusher {
   private readonly patchQueue: Patch[] = [];
@@ -73,13 +79,13 @@ export class OramaSearchStore implements SearchStore, PatchPusher {
   }
 
   public async pull(): Promise<void> {
-    const patches = this.patchQueue.splice(0, this.patchQueue.length);
+    const patches = this.patchQueue.splice(
+      0,
+      this.patchQueue.length,
+    );
     await this.applyPatches(patches);
   }
 
-  /**
-   * @see https://docs.orama.com/docs/cloud/performing-search/search-modes/full-text-search
-   */
   public async search(
     query: string,
     limit: number = 10,
@@ -89,13 +95,14 @@ export class OramaSearchStore implements SearchStore, PatchPusher {
     }
 
     const searchResult = await search(this.options.orama, {
-      mode: "fulltext",
+      mode: this.options.mode,
       term: query,
       limit,
       groupBy: { properties: ["subject"] },
       properties: ["object"],
+      includeVectors: false,
     });
-    if (!searchResult.groups) {
+    if (!searchResult?.groups) {
       return [];
     }
 
@@ -137,7 +144,7 @@ export class OramaSearchStore implements SearchStore, PatchPusher {
   private async applyInsertions(insertions: rdfjs.Quad[]): Promise<void> {
     const insertedDocuments = await Promise.all(
       insertions.map((insertion) =>
-        generateOramaDocument(this.options, insertion)
+        generateOramaDocument(this.options.embedder, insertion)
       ),
     );
 

@@ -6,14 +6,12 @@ export interface Embedder {
 }
 
 /**
- * RandomEmbedder is an embedder that returns a random vector.
+ * ZeroEmbedder is an embedder that returns a zero vector.
  */
-export class RandomEmbedder implements Embedder {
+export class ZeroEmbedder implements Embedder {
   public constructor(private readonly vectorSize: number) {}
 
   public embed(_text: string): Promise<number[]> {
-    return Promise.resolve(
-      Array.from({ length: this.vectorSize }, () => Math.random()),
-    );
+    return Promise.resolve(Array.from({ length: this.vectorSize }, () => 0));
   }
 }
