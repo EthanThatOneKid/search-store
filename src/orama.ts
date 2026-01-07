@@ -2,7 +2,7 @@ import type * as rdfjs from "@rdfjs/types";
 import { create, insertMultiple, removeMultiple, search } from "@orama/orama";
 import type { Embedder } from "./embedder.ts";
 import type { RankedResult, SearchStore } from "./search-store.ts";
-import type { Patch, PatchPusher } from "./rdf-patch.ts";
+import type { Patch, PatchHandler } from "./rdf-patch.ts";
 import { skolemizeQuad } from "./skolem.ts";
 
 /**
@@ -69,12 +69,12 @@ export interface OramaSearchStoreOptions {
  *
  * @see https://docs.orama.com/docs/cloud/performing-search/introduction
  */
-export class OramaSearchStore implements SearchStore, PatchPusher {
+export class OramaSearchStore implements SearchStore, PatchHandler {
   private readonly patchQueue: Patch[] = [];
 
   public constructor(private readonly options: OramaSearchStoreOptions) {}
 
-  public push(...patches: Patch[]): void {
+  public patch(...patches: Patch[]): void {
     this.patchQueue.push(...patches);
   }
 

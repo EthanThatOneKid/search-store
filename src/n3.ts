@@ -2,9 +2,9 @@ import type { Store } from "n3";
 import type * as rdfjs from "@rdfjs/types";
 import type {
   Patch,
+  PatchHandler,
   PatchProxy,
   PatchPuller,
-  PatchPusher,
 } from "./rdf-patch.ts";
 
 /**
@@ -46,7 +46,7 @@ export class N3PatchPuller implements PatchPuller {
  * @see https://rdf.js.org/N3.js/docs/N3Store.html
  */
 export class N3PatchProxy implements PatchProxy<Store> {
-  public proxy(target: Store, pusher: PatchPusher): Store {
+  public proxy(target: Store, handler: PatchHandler): Store {
     return new Proxy(target, {
       get(target: Store, prop: string | symbol, receiver: unknown) {
         switch (prop) {
@@ -54,7 +54,7 @@ export class N3PatchProxy implements PatchProxy<Store> {
             return (quad: rdfjs.Quad) => {
               const result = target.add(quad);
               if (filterStringLiteral(quad)) {
-                pusher.push({ insertions: [quad], deletions: [] });
+                handler.patch({ insertions: [quad], deletions: [] });
               }
               return result;
             };
@@ -64,7 +64,7 @@ export class N3PatchProxy implements PatchProxy<Store> {
             return (quad: rdfjs.Quad) => {
               const result = target.addQuad(quad);
               if (filterStringLiteral(quad)) {
-                pusher.push({ insertions: [quad], deletions: [] });
+                handler.patch({ insertions: [quad], deletions: [] });
               }
 
               return result;
@@ -76,7 +76,7 @@ export class N3PatchProxy implements PatchProxy<Store> {
               const result = target.addQuads(quads);
               const insertions = quads.filter((q) => filterStringLiteral(q));
               if (insertions.length > 0) {
-                pusher.push({ insertions, deletions: [] });
+                handler.patch({ insertions, deletions: [] });
               }
 
               return result;
@@ -87,7 +87,7 @@ export class N3PatchProxy implements PatchProxy<Store> {
             return (quad: rdfjs.Quad) => {
               const result = target.removeQuad(quad);
               if (filterStringLiteral(quad)) {
-                pusher.push({ insertions: [], deletions: [quad] });
+                handler.patch({ insertions: [], deletions: [quad] });
               }
 
               return result;
@@ -99,7 +99,7 @@ export class N3PatchProxy implements PatchProxy<Store> {
               const result = target.removeQuads(quads);
               const deletions = quads.filter((q) => filterStringLiteral(q));
               if (deletions.length > 0) {
-                pusher.push({ insertions: [], deletions: deletions });
+                handler.patch({ insertions: [], deletions: deletions });
               }
 
               return result;
@@ -120,8 +120,8 @@ export class N3PatchProxy implements PatchProxy<Store> {
  */
 export function proxyN3(
   store: Store,
-  pusher: PatchPusher,
+  handler: PatchHandler,
 ): Store {
   const proxy = new N3PatchProxy();
-  return proxy.proxy(store, pusher);
+  return proxy.proxy(store, handler);
 }

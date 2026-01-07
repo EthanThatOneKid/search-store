@@ -1,23 +1,23 @@
 import { assertEquals } from "@std/assert";
 import { DataFactory as N3DataFactory, Store } from "n3";
 import { proxyN3 } from "./n3.ts";
-import type { Patch, PatchPusher } from "./rdf-patch.ts";
+import type { Patch, PatchHandler } from "./rdf-patch.ts";
 
 /**
- * MockPatchPusher captures patches for testing.
+ * FakePatchHandler captures patches for testing.
  */
-class MockPatchPusher implements PatchPusher {
+class FakePatchHandler implements PatchHandler {
   public patches: Patch[] = [];
 
-  public push(...patches: Patch[]): void {
+  public patch(...patches: Patch[]): void {
     this.patches.push(...patches);
   }
 }
 
 Deno.test("proxyN3 intercepts add operations for string literals", () => {
   const store = new Store();
-  const pusher = new MockPatchPusher();
-  const proxiedStore = proxyN3(store, pusher);
+  const handler = new FakePatchHandler();
+  const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
   const testQuad = quad(
@@ -29,11 +29,11 @@ Deno.test("proxyN3 intercepts add operations for string literals", () => {
   proxiedStore.add(testQuad);
 
   // Verify the patch was emitted
-  assertEquals(pusher.patches.length, 1);
-  assertEquals(pusher.patches[0].insertions.length, 1);
-  assertEquals(pusher.patches[0].deletions.length, 0);
+  assertEquals(handler.patches.length, 1);
+  assertEquals(handler.patches[0].insertions.length, 1);
+  assertEquals(handler.patches[0].deletions.length, 0);
   assertEquals(
-    pusher.patches[0].insertions[0].object.value,
+    handler.patches[0].insertions[0].object.value,
     "object value",
   );
 
@@ -45,8 +45,8 @@ Deno.test("proxyN3 intercepts add operations for string literals", () => {
 
 Deno.test("proxyN3 intercepts addQuad operations for string literals", () => {
   const store = new Store();
-  const pusher = new MockPatchPusher();
-  const proxiedStore = proxyN3(store, pusher);
+  const handler = new FakePatchHandler();
+  const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
   const testQuad = quad(
@@ -58,15 +58,15 @@ Deno.test("proxyN3 intercepts addQuad operations for string literals", () => {
   proxiedStore.addQuad(testQuad);
 
   // Verify the patch was emitted
-  assertEquals(pusher.patches.length, 1);
-  assertEquals(pusher.patches[0].insertions.length, 1);
-  assertEquals(pusher.patches[0].deletions.length, 0);
+  assertEquals(handler.patches.length, 1);
+  assertEquals(handler.patches[0].insertions.length, 1);
+  assertEquals(handler.patches[0].deletions.length, 0);
 });
 
 Deno.test("proxyN3 intercepts addQuads operations for string literals", () => {
   const store = new Store();
-  const pusher = new MockPatchPusher();
-  const proxiedStore = proxyN3(store, pusher);
+  const handler = new FakePatchHandler();
+  const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
   const testQuads = [
@@ -85,15 +85,15 @@ Deno.test("proxyN3 intercepts addQuads operations for string literals", () => {
   proxiedStore.addQuads(testQuads);
 
   // Verify the patch was emitted
-  assertEquals(pusher.patches.length, 1);
-  assertEquals(pusher.patches[0].insertions.length, 2);
-  assertEquals(pusher.patches[0].deletions.length, 0);
+  assertEquals(handler.patches.length, 1);
+  assertEquals(handler.patches[0].insertions.length, 2);
+  assertEquals(handler.patches[0].deletions.length, 0);
 });
 
 Deno.test("proxyN3 intercepts removeQuad operations for string literals", () => {
   const store = new Store();
-  const pusher = new MockPatchPusher();
-  const proxiedStore = proxyN3(store, pusher);
+  const handler = new FakePatchHandler();
+  const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
   const testQuad = quad(
@@ -106,17 +106,17 @@ Deno.test("proxyN3 intercepts removeQuad operations for string literals", () => 
   store.add(testQuad);
 
   // Clear patches from the add operation (if any)
-  pusher.patches = [];
+  handler.patches = [];
 
   // Remove through the proxy using removeQuad
   proxiedStore.removeQuad(testQuad);
 
   // Verify the patch was emitted
-  assertEquals(pusher.patches.length, 1);
-  assertEquals(pusher.patches[0].insertions.length, 0);
-  assertEquals(pusher.patches[0].deletions.length, 1);
+  assertEquals(handler.patches.length, 1);
+  assertEquals(handler.patches[0].insertions.length, 0);
+  assertEquals(handler.patches[0].deletions.length, 1);
   assertEquals(
-    pusher.patches[0].deletions[0].object.value,
+    handler.patches[0].deletions[0].object.value,
     "object value",
   );
 
@@ -127,8 +127,8 @@ Deno.test("proxyN3 intercepts removeQuad operations for string literals", () => 
 
 Deno.test("proxyN3 intercepts removeQuads operations for string literals", () => {
   const store = new Store();
-  const pusher = new MockPatchPusher();
-  const proxiedStore = proxyN3(store, pusher);
+  const handler = new FakePatchHandler();
+  const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
   const testQuads = [
@@ -148,21 +148,21 @@ Deno.test("proxyN3 intercepts removeQuads operations for string literals", () =>
   store.addQuads(testQuads);
 
   // Clear patches from the add operation (if any)
-  pusher.patches = [];
+  handler.patches = [];
 
   // Remove through the proxy using removeQuads
   proxiedStore.removeQuads(testQuads);
 
   // Verify the patch was emitted
-  assertEquals(pusher.patches.length, 1);
-  assertEquals(pusher.patches[0].insertions.length, 0);
-  assertEquals(pusher.patches[0].deletions.length, 2);
+  assertEquals(handler.patches.length, 1);
+  assertEquals(handler.patches[0].insertions.length, 0);
+  assertEquals(handler.patches[0].deletions.length, 2);
   assertEquals(
-    pusher.patches[0].deletions[0].object.value,
+    handler.patches[0].deletions[0].object.value,
     "value1",
   );
   assertEquals(
-    pusher.patches[0].deletions[1].object.value,
+    handler.patches[0].deletions[1].object.value,
     "value2",
   );
 
@@ -173,8 +173,8 @@ Deno.test("proxyN3 intercepts removeQuads operations for string literals", () =>
 
 Deno.test("proxyN3 filters non-string literals", () => {
   const store = new Store();
-  const pusher = new MockPatchPusher();
-  const proxiedStore = proxyN3(store, pusher);
+  const handler = new FakePatchHandler();
+  const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
   // Create a literal with integer datatype - this should be filtered out
@@ -200,8 +200,8 @@ Deno.test("proxyN3 filters non-string literals", () => {
 
 Deno.test("proxyN3 filters non-literal objects", () => {
   const store = new Store();
-  const pusher = new MockPatchPusher();
-  const proxiedStore = proxyN3(store, pusher);
+  const handler = new FakePatchHandler();
+  const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, quad } = N3DataFactory;
   const testQuad = quad(
@@ -213,7 +213,7 @@ Deno.test("proxyN3 filters non-literal objects", () => {
   proxiedStore.add(testQuad);
 
   // Verify no patch was emitted for non-literal objects
-  assertEquals(pusher.patches.length, 0);
+  assertEquals(handler.patches.length, 0);
 
   // Verify the quad was still added to the store
   const quads = Array.from(store);
@@ -222,8 +222,8 @@ Deno.test("proxyN3 filters non-literal objects", () => {
 
 Deno.test("proxyN3 passes through other methods", () => {
   const store = new Store();
-  const pusher = new MockPatchPusher();
-  const proxiedStore = proxyN3(store, pusher);
+  const handler = new FakePatchHandler();
+  const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
   const testQuad = quad(
@@ -236,7 +236,7 @@ Deno.test("proxyN3 passes through other methods", () => {
   store.add(testQuad);
 
   // Clear any patches
-  pusher.patches = [];
+  handler.patches = [];
 
   // Test that other methods work (like match) and don't trigger patches
   const quads = Array.from(proxiedStore.match(
@@ -248,5 +248,5 @@ Deno.test("proxyN3 passes through other methods", () => {
   assertEquals(quads.length, 1);
 
   // Verify no patches were emitted for non-mutating operations
-  assertEquals(pusher.patches.length, 0);
+  assertEquals(handler.patches.length, 0);
 });

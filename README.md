@@ -10,8 +10,8 @@ knowledge graphs, with real-time synchronization as the graph changes.
 ### Architecture
 
 - **`PatchProxy`** interface wraps RDF stores to monitor changes and emit
-  patches via `PatchPusher`
-- **`SearchStore`** interface consumes patches via `PatchPusher` and provides
+  patches via `PatchHandler`
+- **`SearchStore`** interface consumes patches via `PatchHandler` and provides
   search functionality
 - **`Embedder`** interface provides optional vector embeddings for semantic
   search
