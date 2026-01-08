@@ -1,22 +1,22 @@
 import { assertEquals } from "@std/assert";
 import { DataFactory as N3DataFactory, Store } from "n3";
 import { proxyN3 } from "./n3.ts";
-import type { Patch, PatchHandler } from "./rdf-patch.ts";
+import type { Patch, PatchHandlerSync } from "./rdf-patch.ts";
 
 /**
- * FakePatchHandler captures patches for testing.
+ * FakePatchHandlerSync captures patches synchronously for testing.
  */
-class FakePatchHandler implements PatchHandler {
+class FakePatchHandlerSync implements PatchHandlerSync {
   public patches: Patch[] = [];
 
-  public patch(...patches: Patch[]): void {
+  public patch(patches: Patch[]): void {
     this.patches.push(...patches);
   }
 }
 
 Deno.test("proxyN3 intercepts add operations for string literals", () => {
   const store = new Store();
-  const handler = new FakePatchHandler();
+  const handler = new FakePatchHandlerSync();
   const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
@@ -45,7 +45,7 @@ Deno.test("proxyN3 intercepts add operations for string literals", () => {
 
 Deno.test("proxyN3 intercepts addQuad operations for string literals", () => {
   const store = new Store();
-  const handler = new FakePatchHandler();
+  const handler = new FakePatchHandlerSync();
   const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
@@ -65,7 +65,7 @@ Deno.test("proxyN3 intercepts addQuad operations for string literals", () => {
 
 Deno.test("proxyN3 intercepts addQuads operations for string literals", () => {
   const store = new Store();
-  const handler = new FakePatchHandler();
+  const handler = new FakePatchHandlerSync();
   const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
@@ -92,7 +92,7 @@ Deno.test("proxyN3 intercepts addQuads operations for string literals", () => {
 
 Deno.test("proxyN3 intercepts removeQuad operations for string literals", () => {
   const store = new Store();
-  const handler = new FakePatchHandler();
+  const handler = new FakePatchHandlerSync();
   const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
@@ -127,7 +127,7 @@ Deno.test("proxyN3 intercepts removeQuad operations for string literals", () => 
 
 Deno.test("proxyN3 intercepts removeQuads operations for string literals", () => {
   const store = new Store();
-  const handler = new FakePatchHandler();
+  const handler = new FakePatchHandlerSync();
   const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
@@ -173,7 +173,7 @@ Deno.test("proxyN3 intercepts removeQuads operations for string literals", () =>
 
 Deno.test("proxyN3 filters non-string literals", () => {
   const store = new Store();
-  const handler = new FakePatchHandler();
+  const handler = new FakePatchHandlerSync();
   const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;
@@ -200,7 +200,7 @@ Deno.test("proxyN3 filters non-string literals", () => {
 
 Deno.test("proxyN3 filters non-literal objects", () => {
   const store = new Store();
-  const handler = new FakePatchHandler();
+  const handler = new FakePatchHandlerSync();
   const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, quad } = N3DataFactory;
@@ -222,7 +222,7 @@ Deno.test("proxyN3 filters non-literal objects", () => {
 
 Deno.test("proxyN3 passes through other methods", () => {
   const store = new Store();
-  const handler = new FakePatchHandler();
+  const handler = new FakePatchHandlerSync();
   const proxiedStore = proxyN3(store, handler);
 
   const { namedNode, literal, quad } = N3DataFactory;

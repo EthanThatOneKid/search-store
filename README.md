@@ -9,23 +9,25 @@ knowledge graphs, with real-time synchronization as the graph changes.
 
 ### Architecture
 
-- **`PatchProxy`** interface wraps RDF stores to monitor changes and emit
-  patches via `PatchHandler`
-- **`SearchStore`** interface consumes patches via `PatchHandler` and provides
-  search functionality
-- **`Embedder`** interface provides optional vector embeddings for semantic
-  search
+- **`PatchHandler`** interface handles patches (insertions and deletions of RDF
+  quads)
+- **`SearchStore`** interface extends `PatchHandler` and provides search
+  functionality
+- Helper functions (e.g., `proxyN3`, `connectSearchStoreToN3Store`) wrap RDF
+  stores to monitor changes and emit patches
 
 Proof-of-concept implementations exist for each interface, but the architecture
-is defined by these interfaces rather than specific implementations.
+is defined by these interfaces rather than specific implementations. Optional
+vector embeddings for semantic search can be provided by implementations (see
+examples).
 
 ### Key Features
 
 - **Patch-based updates**: Tracks insertions and deletions of RDF quads
-- **Hybrid search**: Combines text search with vector embeddings (RRF) when an
-  `Embedder` is provided
-- **Real-time synchronization**: `PatchProxy` wraps RDF stores to automatically
-  emit patches on changes
+- **Hybrid search**: Combines text search with optional vector embeddings (RRF)
+  when provided by implementations
+- **Real-time synchronization**: Helper functions wrap RDF stores to
+  automatically emit patches on changes
 - **Sequential processing**: Patches are processed in order to maintain
   consistency
 - **String literal indexing**: Only string literals (language-tagged or plain)
@@ -36,7 +38,26 @@ is defined by these interfaces rather than specific implementations.
 Add full-text and semantic search to RDF knowledge graphs, with automatic
 updates as the graph changes.
 
-## RDF 1.1 Notes
+See the [Solar System example](./examples/solar-system/main.ts) for a search
+store implementation with Orama.
+
+### Contribute
+
+Contributions are welcome! Please feel free to submit a pull request.
+
+Run the precommit tasks:
+
+```sh
+deno task precommit
+```
+
+Run the Solar System example:
+
+```sh
+deno task example
+```
+
+### RDF 1.1 Notes
 
 - A literal cannot have both a language tag and a datatype
 - Language-tagged literals are `rdf:langString` (string type)

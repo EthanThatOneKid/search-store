@@ -1,7 +1,7 @@
 import type * as rdfjs from "@rdfjs/types";
 import { create, insertMultiple, removeMultiple, search } from "@orama/orama";
 import type { SearchResult, SearchStore } from "#/search-store.ts";
-import type { Patch, PatchHandler } from "#/rdf-patch.ts";
+import type { Patch } from "#/rdf-patch.ts";
 import { skolemizeQuad } from "#/skolem.ts";
 import type { Embedder } from "./embedder.ts";
 
@@ -69,27 +69,35 @@ export interface OramaSearchStoreOptions {
  *
  * @see https://docs.orama.com/docs/cloud/performing-search/introduction
  */
-export class OramaSearchStore
-  implements SearchStore<rdfjs.NamedNode>, PatchHandler {
-  private readonly patchQueue: Patch[] = [];
-
+export class OramaSearchStore implements SearchStore<rdfjs.NamedNode> {
   public constructor(private readonly options: OramaSearchStoreOptions) {}
 
-  public patch(...patches: Patch[]): void {
-    this.patchQueue.push(...patches);
+  public async addQuads(quads: rdfjs.Quad[]): Promise<void> {
+    const insertedDocuments = await Promise.all(
+      quads.map((quad) => generateOramaDocument(this.options.embedder, quad)),
+    );
+
+    await insertMultiple(this.options.orama, insertedDocuments);
   }
 
-  public async pull(): Promise<void> {
-    const patches = this.patchQueue.splice(
-      0,
-      this.patchQueue.length,
+  public async removeQuads(quads: rdfjs.Quad[]): Promise<void> {
+    const deletedDocumentIds = await Promise.all(
+      quads.map((quad) => skolemizeQuad(quad)),
     );
-    await this.applyPatches(patches);
+
+    await removeMultiple(this.options.orama, deletedDocumentIds);
+  }
+
+  public async patch(patches: Patch[]): Promise<void> {
+    for (const patch of patches) {
+      await this.removeQuads(patch.deletions);
+      await this.addQuads(patch.insertions);
+    }
   }
 
   public async search(
     query: string,
-    limit: number = 10,
+    limit = 10,
   ): Promise<SearchResult<rdfjs.NamedNode>[]> {
     if (!query || query.trim().length === 0) {
       return [];
@@ -124,30 +132,5 @@ export class OramaSearchStore
         value,
       };
     });
-  }
-
-  private async applyPatches(patches: Patch[]): Promise<void> {
-    for (const patch of patches) {
-      await this.applyDeletions(patch.deletions);
-      await this.applyInsertions(patch.insertions);
-    }
-  }
-
-  private async applyDeletions(deletions: rdfjs.Quad[]): Promise<void> {
-    const deletedDocumentIds = await Promise.all(
-      deletions.map((deletion) => skolemizeQuad(deletion)),
-    );
-
-    await removeMultiple(this.options.orama, deletedDocumentIds);
-  }
-
-  private async applyInsertions(insertions: rdfjs.Quad[]): Promise<void> {
-    const insertedDocuments = await Promise.all(
-      insertions.map((insertion) =>
-        generateOramaDocument(this.options.embedder, insertion)
-      ),
-    );
-
-    await insertMultiple(this.options.orama, insertedDocuments);
   }
 }

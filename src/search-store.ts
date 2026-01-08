@@ -1,7 +1,9 @@
+import type { PatchHandler } from "./rdf-patch.ts";
+
 /**
  * SearchStore is a store that can be searched.
  */
-export interface SearchStore<T> {
+export interface SearchStore<T> extends PatchHandler {
   /**
    * search searches the store for nodes matching the query.
    */
